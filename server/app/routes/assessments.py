@@ -148,7 +148,34 @@ def submit_assessment():
         
         stress_level = combined_res["final_diagnosis"]
         final_code = combined_res["final_code"]
-        score = int(combined_res["final_score"] * 100) # konversi ke 0-100%
+        
+        # Hitung persentase tingkat stres yang konsisten dengan rentang kategori diagnosis:
+        # D1: 0% - 25%, D2: 26% - 50%, D3: 51% - 75%, D4: 76% - 100%
+        breakdown = combined_res["score_breakdown"]
+        p_D1 = breakdown.get("Tidak Stres", 0.0)
+        p_D2 = breakdown.get("Stres Ringan", 0.0)
+        p_D3 = breakdown.get("Stres Sedang", 0.0)
+        p_D4 = breakdown.get("Stres Berat", 0.0)
+        
+        final_idx = int(final_code[1]) - 1  # D1 -> 0, D2 -> 1, D3 -> 2, D4 -> 3
+        
+        if final_idx == 0:  # Tidak Stres (D1) -> Range [0, 25]
+            calculated_score = 25 * (1.0 - p_D1)
+        elif final_idx == 1:  # Stres Ringan (D2) -> Range [26, 50]
+            denom = p_D1 + p_D3 + p_D4
+            fraction = (p_D3 + p_D4) / denom if denom > 0 else 0.5
+            calculated_score = 26 + fraction * 24
+        elif final_idx == 2:  # Stres Sedang (D3) -> Range [51, 75]
+            denom = p_D1 + p_D2 + p_D4
+            fraction = p_D4 / denom if denom > 0 else 0.5
+            calculated_score = 51 + fraction * 24
+        elif final_idx == 3:  # Stres Berat (D4) -> Range [76, 100]
+            calculated_score = 76 + ((p_D4 - 0.25) / 0.75) * 24
+        else:
+            calculated_score = 0.0
+            
+        score = int(round(calculated_score))
+
         
         # Ambil rekomendasi
         rec_info = REKOMENDASI.get(final_code, REKOMENDASI["D1"])
